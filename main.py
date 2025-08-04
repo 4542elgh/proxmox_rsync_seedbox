@@ -1,0 +1,88 @@
+import os
+from dotenv import load_dotenv
+from api.Arr import Arr
+from ssh.ssh import SSH
+from db.db import DB
+from db.db_queries import DB_Query
+from cli.rsync import Rsync
+from cli import utils
+from enums.enum import DB_ENUM
+
+load_dotenv()
+
+DB_PATH = "db/database.db"
+
+def main(db_verbose=False, verbose=False, dev=False):
+    if dev and os.path.exists(DB_PATH):
+        os.remove(DB_PATH)  # Remove the database file if it exists, for testing purposes only
+
+    if(utils.check_rsync_running_state()):
+        print("Rsync is currently running. Exiting to avoid conflicts.")
+        exit(0)
+
+    ArrService = Arr()
+    sonarr_api_queue = ArrService.get_api_queue(DB_ENUM.SONARR)
+    radarr_api_queue = ArrService.get_api_queue(DB_ENUM.RADARR)
+
+    # # These are imports pending in Arr and exists in seedbox, filtering so only remote seedbox torrent are included
+    ssh_conn = SSH(host=os.getenv("SEEDBOX_ENDPOINT"), port=os.getenv("SEEDBOX_PORT"), username=os.getenv("SEEDBOX_USERNAME"))
+    sonarr_pending_import = ssh_conn.filter_seedbox_against_api(sonarr_api_queue, DB_ENUM.SONARR)
+    radarr_pending_import = ssh_conn.filter_seedbox_against_api(radarr_api_queue, DB_ENUM.RADARR)
+
+    if verbose:
+        print("Sonarr list pending import:")
+        if len(sonarr_pending_import) == 0:
+            print(" - No pending Sonarr imports found.")
+        else:
+            for item in sonarr_pending_import:
+                print(f" - {item}")
+        print("Radarr list pending import:")
+        if len(radarr_pending_import) == 0:
+            print(" - No pending Radarr imports found.")
+        else:
+            for item in radarr_pending_import:
+                print(f" - {item}")
+
+    # # Check against database if the torrent already tried import. Try a max of 3 times before giving up and send Discord message
+    db = DB(db_verbose)
+    db_engine = db.get_engine()
+    db_query = DB_Query(db_engine, query_verbose=verbose)
+
+    # Mark torrent name not in API result list as complete.
+    # It either finish transfer or user cancel the import job
+    # Those entries not useful anymore
+    print("Marking any torrent not in API result list as complete.")
+    db_query.mark_db_complete(sonarr_pending_import, DB_ENUM.SONARR)
+    db_query.mark_db_complete(radarr_pending_import, DB_ENUM.RADARR)
+
+    print("Purging local complete content.")
+    # If it does not exists in API anymore, it means the import is complete
+    db_query.purge_local_complete_content(os.getenv("SONARR_DEST_DIR"), DB_ENUM.SONARR)
+    db_query.purge_local_complete_content(os.getenv("RADARR_DEST_DIR"), DB_ENUM.RADARR)
+
+    # Only return list of full path seedbox torrents not in database (aka. new torrents)
+    sonarr_seedbox_torrent_full_path = db_query.check_torrents_and_get_full_path(sonarr_pending_import, DB_ENUM.SONARR)
+    radarr_seedbox_torrent_full_path = db_query.check_torrents_and_get_full_path(radarr_pending_import, DB_ENUM.RADARR)
+
+    if len(sonarr_seedbox_torrent_full_path) > 0:
+        Rsync(user = os.getenv("SEEDBOX_USERNAME", ""),
+            seedbox_url = os.getenv("SEEDBOX_ENDPOINT", ""),
+            sources = sonarr_seedbox_torrent_full_path,
+            destination = os.getenv("SONARR_DEST_DIR", ""),
+            port = os.getenv("SEEDBOX_PORT", "0"),
+            arr_name = "Sonarr",
+            verbose = verbose).execute()
+    else:
+        print("No Sonarr torrents to transfer.")
+
+    if len(radarr_seedbox_torrent_full_path) > 0:
+        Rsync(user=os.getenv("SEEDBOX_USERNAME", ""),
+            seedbox_url=os.getenv("SEEDBOX_ENDPOINT", ""),
+            sources=radarr_seedbox_torrent_full_path,
+            destination=os.getenv("RADARR_DEST_DIR", ""),
+            port=os.getenv("SEEDBOX_PORT", "0")).execute()
+    else:
+        print("No Radarr torrents to transfer.")
+
+if __name__ == "__main__":
+    main(db_verbose=False, verbose=True, dev=False)

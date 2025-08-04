@@ -1,0 +1,4 @@
+# Rclone synchronization script
+This project is aimed to reduce `rclone` cloning entire remote seedbox content to local for Radarr/Sonarr to import. (A major waste of disk space). This script will look at Radarr/Sonarr's queue and grab matching file/directory from seedbox to local so Radarr/Sonarr can import them. Then the file/directory will be deleted to save space. Then such filename will mark as synced in a `sqlite3` database to keep track and never rclone the same file/directory again.
+
+This script will only grab what is requested from your Sonarr/Radarr instance. Whatever Sonarr/Radarr queue on SeedBox is not considered.

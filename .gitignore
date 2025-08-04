@@ -1,0 +1,6 @@
+.env
+.venv
+old_script
+db/database.db
+**/__pycache__
+Bruno
