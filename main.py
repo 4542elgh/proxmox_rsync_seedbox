@@ -12,7 +12,7 @@ load_dotenv()
 
 DB_PATH = "db/database.db"
 
-def main(db_verbose=False, verbose=False, dev=False):
+def main(db_verbose:bool=False, verbose:bool=False, dev:bool=False):
     if dev and os.path.exists(DB_PATH):
         os.remove(DB_PATH)  # Remove the database file if it exists, for testing purposes only
 
@@ -49,13 +49,10 @@ def main(db_verbose=False, verbose=False, dev=False):
     db_query = DB_Query(db_engine, query_verbose=verbose)
 
     # Mark torrent name not in API result list as complete.
-    # It either finish transfer or user cancel the import job
-    # Those entries not useful anymore
-    print("Marking any torrent not in API result list as complete.")
+    # It either finish transfer or user cancel the import job in Activity Tab
     db_query.mark_db_complete(sonarr_pending_import, DB_ENUM.SONARR)
     db_query.mark_db_complete(radarr_pending_import, DB_ENUM.RADARR)
 
-    print("Purging local complete content.")
     # If it does not exists in API anymore, it means the import is complete
     db_query.purge_local_complete_content(os.getenv("SONARR_DEST_DIR"), DB_ENUM.SONARR)
     db_query.purge_local_complete_content(os.getenv("RADARR_DEST_DIR"), DB_ENUM.RADARR)
@@ -72,7 +69,7 @@ def main(db_verbose=False, verbose=False, dev=False):
             port = os.getenv("SEEDBOX_PORT", "0"),
             arr_name = "Sonarr",
             verbose = verbose).execute()
-    else:
+    elif verbose:
         print("No Sonarr torrents to transfer.")
 
     if len(radarr_seedbox_torrent_full_path) > 0:
@@ -81,8 +78,10 @@ def main(db_verbose=False, verbose=False, dev=False):
             sources=radarr_seedbox_torrent_full_path,
             destination=os.getenv("RADARR_DEST_DIR", ""),
             port=os.getenv("SEEDBOX_PORT", "0")).execute()
-    else:
+    elif verbose:
         print("No Radarr torrents to transfer.")
 
 if __name__ == "__main__":
-    main(db_verbose=False, verbose=True, dev=False)
+    main(db_verbose = os.getenv("DB_VERBOSE", "False").lower() == "true",
+         verbose = os.getenv("VERBOSE", "False").lower() == "true",
+         dev = os.getenv("DEV", "False").lower() == "true")

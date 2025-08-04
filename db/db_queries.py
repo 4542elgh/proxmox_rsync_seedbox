@@ -22,9 +22,9 @@ class DB_Query:
             It will not mark as complete if:
                 1. Title mismatch and require manual intervention
         """
-        print("Marking DB entries complete since they dont exists in API anymore")
         stmt = None
         if self.query_verbose:
+            print(f"Marking {arr_name} DB entries complete since they dont exists in API anymore")
             if arr_name == DB_ENUM.SONARR:
                 stmt = select(SonarrDB).where(and_(SonarrDB.torrent_name.not_in(torrents), SonarrDB.import_complete == False))
             elif arr_name == DB_ENUM.RADARR:
@@ -35,7 +35,7 @@ class DB_Query:
 
             result_set = self.session.execute(stmt).all()
             if len(result_set) == 0:
-                print(f"No entries to mark as complete in {arr_name} database.")
+                print(f" - No entries to mark as complete in {arr_name} database.")
                 return
             else:
                 print(f"Found {len(result_set)} entries to mark as complete in {arr_name} database.")
@@ -68,8 +68,9 @@ class DB_Query:
 
         result_set = self.session.execute(stmt).all()
         if self.query_verbose:
+            print(f"Purging {arr_name}'s local complete content.")
             if len(result_set) == 0:
-                print(f"No {arr_name} entries to purge.")
+                print(f" - No {arr_name} entries to purge.")
                 return None
             else:
                 print(f"Found {len(result_set)} {arr_name} entries to purge.")
