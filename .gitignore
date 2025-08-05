@@ -1,5 +1,6 @@
 .env
 .venv
+*.vault
 old_script
 db/database.db
 **/__pycache__

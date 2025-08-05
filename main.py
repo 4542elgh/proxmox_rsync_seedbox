@@ -81,6 +81,14 @@ def main(db_verbose:bool=False, verbose:bool=False, dev:bool=False):
     elif verbose:
         print("No Radarr torrents to transfer.")
 
+    if len(sonarr_seedbox_torrent_full_path) == 0 and len(radarr_seedbox_torrent_full_path) == 0:
+        print("No new torrents to transfer.")
+    elif len(sonarr_seedbox_torrent_full_path) > 0 or len(radarr_seedbox_torrent_full_path) > 0:
+        if len(sonarr_seedbox_torrent_full_path) > 0:
+            print(f"Transferred {len(sonarr_seedbox_torrent_full_path)} new Sonarr torrents.")
+        elif len(radarr_seedbox_torrent_full_path) > 0:
+            print(f"Transferred {len(radarr_seedbox_torrent_full_path)} new Radarr torrents.")
+
 if __name__ == "__main__":
     main(db_verbose = os.getenv("DB_VERBOSE", "False").lower() == "true",
          verbose = os.getenv("VERBOSE", "False").lower() == "true",
