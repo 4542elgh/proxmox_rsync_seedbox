@@ -23,43 +23,25 @@ This project is aimed to reduce `rsync` cloning entire remote seedbox content to
 Create a `.env` file from `.env.example` in the project root. Replace all keys with your own Arr credentials. Debugging messages are off by default
 
 ## 3. Run application
-Source the `.venv` directory (please do use a virtual environment, just for good practice) and run the `main.py` script:
+Source the `.venv` directory **(please do use a virtual environment, its generally good practice)** and run the `main.py` script:
 ```bash
     python main.py
 ```
 
-4. How It Works
-API Queue Fetch: Gets the list of torrents pending import from Radarr/Sonarr.
-Seedbox Filtering: Checks which of these files exist on the seedbox via SSH.
-Database Check: Determines which files are new or need to be retried (up to 3 times).
-Rsync Transfer: Transfers eligible files from the seedbox to the local import directory.
-Mark Complete: Marks files not in the API queue as completed in the database.
-Purge: Deletes local files that have been successfully imported and marks them as purged.
-Key Modules
-main.py: Entry point, orchestrates the workflow.
-Arr.py: Handles API requests to Radarr/Sonarr.
-ssh.py: SSH connection and remote file listing.
-rsync.py: Rsync wrapper for file transfer.
-db.py, db_queries.py: Database setup and queries.
-tbl_radarr.py, tbl_sonarr.py: Database models.
-Database Schema
-tbl_radarr / tbl_sonarr
-id: Primary key
-torrent_name: Name of the torrent
-retries: Number of import attempts
-import_complete: Boolean, import status
-notified: Boolean, notification sent after max retries
-purged: Boolean, file deleted locally
-completed_on: DateTime, when marked complete
-API Models
-See RadarrResponse.py and SonarrResponse.py for full response models.
+# How It Works
+1. Gets the list of torrents pending import from local Radarr/Sonarr API
+2. Checks which of these files exist on the seedbox via SSH. (Doesnt make sense to transfer file that doesnt exist on Seedbox)
+3. Determines which files are new (INSERT to db) or need to be retried (UPDATE the db) (up to 3 times).
+4. Transfers eligible files from seedbox to the local Radarr/Sonarr import directory.
+## 2nd time it runs
+1. Marks entries exists in DB but not in the Radarr/Sonarr API as completed.
+    - Since a torrent import is not in API any more, it must mean import is complete or user cancelled the import task in Activity tab
+2. Deletes local files that have been successfully imported and marks them as purged in DB.
 
-Troubleshooting
-Ensure all environment variables are set correctly.
-Check SSH connectivity to the seedbox.
-Make sure rsync is installed and accessible.
-Review verbose logs for errors.
-License
-This project is for personal use. See .gitignore for excluded files and folders.
-
-For more details, see the source code and comments in each module.
+# Troubleshooting
+## RADAR_*** or SONAR_*** is not defined.
+Please ensure your .env is filled with your own credentials from Sonarr/Radarr client
+## Cannot make a connection to seedbox
+Check SSH connectivity to the seedbox and make sure it is using key authentication
+## Rsync is not installed
+Please check if rsync is installed on **both end** of the system. Your local machine should have it, the seedbox should also have it.
