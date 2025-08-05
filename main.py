@@ -5,8 +5,9 @@ from ssh.ssh import SSH
 from db.db import DB
 from db.db_queries import DB_Query
 from cli.rsync import Rsync
-from cli import utils
-from enums.enum import DB_ENUM
+from cli import rsync
+from enums.enum import DB_ENUM, NOTIFICATION_ENUM
+from cli.notification import Notification
 
 load_dotenv()
 
@@ -16,7 +17,7 @@ def main(db_verbose:bool=False, verbose:bool=False, dev:bool=False):
     if dev and os.path.exists(DB_PATH):
         os.remove(DB_PATH)  # Remove the database file if it exists, for testing purposes only
 
-    if(utils.check_rsync_running_state()):
+    if(rsync.check_running_state()):
         print("Rsync is currently running. Exiting to avoid conflicts.")
         exit(0)
 
@@ -84,10 +85,18 @@ def main(db_verbose:bool=False, verbose:bool=False, dev:bool=False):
     if len(sonarr_seedbox_torrent_full_path) == 0 and len(radarr_seedbox_torrent_full_path) == 0:
         print("No new torrents to transfer.")
     elif len(sonarr_seedbox_torrent_full_path) > 0 or len(radarr_seedbox_torrent_full_path) > 0:
+        message = ""
+
         if len(sonarr_seedbox_torrent_full_path) > 0:
             print(f"Transferred {len(sonarr_seedbox_torrent_full_path)} new Sonarr torrents.")
-        elif len(radarr_seedbox_torrent_full_path) > 0:
+            message += f"Transferred {len(sonarr_seedbox_torrent_full_path)} new Sonarr torrents:\n"
+            message += "\n".join(os.path.basename(path) for path in sonarr_seedbox_torrent_full_path) + "\n"
+        if len(radarr_seedbox_torrent_full_path) > 0:
             print(f"Transferred {len(radarr_seedbox_torrent_full_path)} new Radarr torrents.")
+            message += f"Transferred {len(sonarr_seedbox_torrent_full_path)} new Radarr torrents:\n"
+            message += "\n".join(os.path.basename(path) for path in radarr_seedbox_torrent_full_path) + "\n"
+
+        Notification(os.getenv("WEBHOOK_URL")).send_notification(message)
 
 if __name__ == "__main__":
     main(db_verbose = os.getenv("DB_VERBOSE", "False").lower() == "true",
