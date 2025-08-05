@@ -9,7 +9,6 @@ This project is aimed to reduce `rsync` cloning entire remote seedbox content to
 - **Database Tracking**: Uses SQLite to track import attempts, retries, and completion status.
 - **Automatic Cleanup**: Deletes files locally after successful import and marks them as purged in the database.
 - **Retry Logic**: Retries failed imports up to 3 times before requiring manual intervention.
-    - **TODO: Trigger notification system via apprise or discord webhook**
 - **API Integration**: Fetches queue data from Radarr/Sonarr via their APIs.
 - **SSH & Rsync**: Uses SSH for remote file listing and rsync for file transfer.
 - **Environment Configuration**: All credentials and paths are managed via `.env`
@@ -45,3 +44,7 @@ Please ensure your .env is filled with your own credentials from Sonarr/Radarr c
 Check SSH connectivity to the seedbox and make sure it is using key authentication
 ## Rsync is not installed
 Please check if rsync is installed on **both end** of the system. Your local machine should have it, the seedbox should also have it.
+
+# TODO
+- Trigger notification system via apprise or discord webhook
+- Unit Test
