@@ -1,7 +1,14 @@
 # rsync synchronization script
-This project is aimed to reduce `rsync` cloning entire remote seedbox content to local for Radarr/Sonarr to import. (A major waste of disk space). This script will look at Radarr/Sonarr's queue and grab matching file/directory from seedbox to local drive so Radarr/Sonarr can import them. Then the file/directory will be deleted to save space. Such file/directory name will mark as synced in a `sqlite3` database to keep track and never `rsync` the same file/directory again.
+This project is aimed to solve `rsync` cloning entire remote seedbox content to local for Radarr/Sonarr to import. (A major waste of disk space). 
+
+This script will look at local Radarr/Sonarr's queue and grab matching file/directory from seedbox to local drive so Radarr/Sonarr can import them. Then the file/directory will be deleted to save space. Such file/directory name will mark as synced in a `sqlite3` database to keep track and never `rsync` the same file/directory again.
 
 **This script will only grab (only work with) what is requested from your local Sonarr/Radarr instance.**
+
+**This script is intended to run as a scheduled job (crontab/systemctl) to always maintain up to date file with seedbox content**
+
+# Screenshot
+![](./img/Process.png)
 
 # Features
 - **Selective Sync**: Only transfers files that are pending import in local Radarr/Sonarr instance.
