@@ -21,17 +21,31 @@ This script will look at local Radarr/Sonarr's queue and grab matching file/dire
 - **Environment Configuration**: All credentials and paths are managed via `.env`
 
 # Setup
-## 1. Install pip dependencies
-```bash
-    pip install -r requirements.txt
-```
-## 2. Environment Variables
+## 1. Configure Environment Variables
 Create a `.env` file from `.env.example` in the project root. Replace all keys with your own Arr credentials. Debugging messages are off by default
 
-## 3. Run application
-Source the `.venv` directory **(please do use a virtual environment, its generally good practice)** and run the `main.py` script:
+## 2. Create virtual environment
 ```bash
-    python main.py
+python3 -m venv .venv
+```
+
+## 3. Activate virtual environment
+```bash
+source .venv/bin/activate
+```
+Windows user
+```ps1
+.venv/bin/activate.ps1
+```
+
+## 4. Install pip dependencies
+```bash
+pip install -r requirements.txt
+```
+
+## 5. Run application
+```bash
+python main.py
 ```
 
 # How It Works

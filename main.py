@@ -4,9 +4,9 @@ from api.Arr import Arr
 from ssh.ssh import SSH
 from db.db import DB
 from db.db_queries import DB_Query
-from cli.rsync import Rsync
+from enums.enum import DB_ENUM
 from cli import rsync
-from enums.enum import DB_ENUM, NOTIFICATION_ENUM
+from cli.rsync import Rsync
 from cli.notification import Notification
 
 load_dotenv()
