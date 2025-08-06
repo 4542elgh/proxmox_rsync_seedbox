@@ -1,4 +1,4 @@
-# rsync synchronization script
+# Proxmox rsync Seedbox
 This project is aimed to solve `rsync` cloning entire remote seedbox content to local for Radarr/Sonarr to import. (A major waste of disk space). 
 
 This script will look at local Radarr/Sonarr's queue and grab matching file/directory from seedbox to local drive so Radarr/Sonarr can import them. Then the file/directory will be deleted to save space. Such file/directory name will mark as synced in a `sqlite3` database to keep track and never `rsync` the same file/directory again.
