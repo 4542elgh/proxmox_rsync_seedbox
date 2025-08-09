@@ -93,7 +93,7 @@ def main(db_verbose:bool=False, verbose:bool=False, dev:bool=False):
             message += "\n".join(os.path.basename(path) for path in sonarr_seedbox_torrent_full_path) + "\n"
         if len(radarr_seedbox_torrent_full_path) > 0:
             print(f"Transferred {len(radarr_seedbox_torrent_full_path)} new Radarr torrents.")
-            message += f"Transferred {len(sonarr_seedbox_torrent_full_path)} new Radarr torrents:\n"
+            message += f"Transferred {len(radarr_seedbox_torrent_full_path)} new Radarr torrents:\n"
             message += "\n".join(os.path.basename(path) for path in radarr_seedbox_torrent_full_path) + "\n"
 
         Notification(os.getenv("WEBHOOK_URL")).send_notification(message)
