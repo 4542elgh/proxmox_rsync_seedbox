@@ -12,7 +12,7 @@ class Notification:
         self.webhook_url = webhook_url
         self.verbose = verbose
 
-    def send_notification(self, message: str) -> None:
+    def send_notification(self, message: str, severity: str) -> None:
         if os.getenv("NOTIFICATION_SERVICE") is None or os.getenv("WEBHOOK_URL") is None:
             if self.verbose:
                 print("Notification service or webhook URL is not set. Skipping notification.")
@@ -25,14 +25,22 @@ class Notification:
         payload = {}
         headers = {}
         if os.getenv("NOTIFICATION_SERVICE") == NOTIFICATION_ENUM.APPRISE:
+            # apprise only support plain text
             payload = {
                 "body": message,
                 "tags": "all" if os.getenv("APPRISE_TAG") is None else os.getenv("APPRISE_TAG")
             }
             headers = {}
+
         elif os.getenv("NOTIFICATION_SERVICE") == NOTIFICATION_ENUM.DISCORD:
+            # Only vanilla Discord Webhook support embeds
             payload = {
-                "content": message
+                "embeds": [
+                    {
+                        "title": message,
+                        "color": 16711680 if severity == "error" else 65280
+                    }
+                ]
             }
             headers = {
                 "Content-Type": "application/json"

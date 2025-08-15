@@ -63,7 +63,7 @@ def main(db_verbose:bool=False, verbose:bool=False, dev:bool=False):
     radarr_seedbox_torrent_full_path = db_query.check_torrents_and_get_full_path(radarr_pending_import, DB_ENUM.RADARR)
 
     if len(sonarr_seedbox_torrent_full_path) > 0:
-        Rsync(user = os.getenv("SEEDBOX_USERNAME", ""),
+        sonarr_rsync_status, sonarr_rsync_msg = Rsync(user = os.getenv("SEEDBOX_USERNAME", ""),
             seedbox_url = os.getenv("SEEDBOX_ENDPOINT", ""),
             sources = sonarr_seedbox_torrent_full_path,
             destination = os.getenv("SONARR_DEST_DIR", ""),
@@ -74,11 +74,12 @@ def main(db_verbose:bool=False, verbose:bool=False, dev:bool=False):
         print("No Sonarr torrents to transfer.")
 
     if len(radarr_seedbox_torrent_full_path) > 0:
-        Rsync(user=os.getenv("SEEDBOX_USERNAME", ""),
+        radarr_rsync_status, radarr_rsync_msg = Rsync(user=os.getenv("SEEDBOX_USERNAME", ""),
             seedbox_url=os.getenv("SEEDBOX_ENDPOINT", ""),
             sources=radarr_seedbox_torrent_full_path,
             destination=os.getenv("RADARR_DEST_DIR", ""),
-            port=os.getenv("SEEDBOX_PORT", "0")).execute()
+            port=os.getenv("SEEDBOX_PORT", "0"),
+            verbose = verbose).execute()
     elif verbose:
         print("No Radarr torrents to transfer.")
 
@@ -86,17 +87,27 @@ def main(db_verbose:bool=False, verbose:bool=False, dev:bool=False):
         print("No new torrents to transfer.")
     elif len(sonarr_seedbox_torrent_full_path) > 0 or len(radarr_seedbox_torrent_full_path) > 0:
         message = ""
+        severity = "message"
 
         if len(sonarr_seedbox_torrent_full_path) > 0:
-            print(f"Transferred {len(sonarr_seedbox_torrent_full_path)} new Sonarr torrents.")
-            message += f"Transferred {len(sonarr_seedbox_torrent_full_path)} new Sonarr torrents:\n"
-            message += "\n".join(os.path.basename(path) for path in sonarr_seedbox_torrent_full_path) + "\n"
+            if sonarr_rsync_status:
+                print(f"Transferred {len(sonarr_seedbox_torrent_full_path)} new Sonarr torrents.")
+                message += f"Transferred {len(sonarr_seedbox_torrent_full_path)} new Sonarr torrents:\n"
+                message += "\n".join(os.path.basename(path) for path in sonarr_seedbox_torrent_full_path) + "\n"
+            else:
+                print(f"Transferred faild for Sonarr torrents with error message: {sonarr_rsync_msg}")
+                message += f"Transferred faild for Sonarr torrents with error message: {sonarr_rsync_msg}" 
+                severity = "error"
         if len(radarr_seedbox_torrent_full_path) > 0:
-            print(f"Transferred {len(radarr_seedbox_torrent_full_path)} new Radarr torrents.")
-            message += f"Transferred {len(radarr_seedbox_torrent_full_path)} new Radarr torrents:\n"
-            message += "\n".join(os.path.basename(path) for path in radarr_seedbox_torrent_full_path) + "\n"
-
-        Notification(os.getenv("WEBHOOK_URL")).send_notification(message)
+            if radarr_rsync_status:
+                print(f"Transferred {len(radarr_seedbox_torrent_full_path)} new Radarr torrents.")
+                message += f"Transferred {len(sonarr_seedbox_torrent_full_path)} new Radarr torrents:\n"
+                message += "\n".join(os.path.basename(path) for path in radarr_seedbox_torrent_full_path) + "\n"
+            else:
+                print(f"Transferred faild for Radarr torrents with error message: {radarr_rsync_msg}")
+                message += f"Transferred faild for Radarr torrents with error message: {radarr_rsync_msg}" 
+                severity = "error"
+        Notification(os.getenv("WEBHOOK_URL")).send_notification(message, severity)
 
 if __name__ == "__main__":
     main(db_verbose = os.getenv("DB_VERBOSE", "False").lower() == "true",

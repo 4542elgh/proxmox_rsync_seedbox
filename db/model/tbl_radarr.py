@@ -12,8 +12,7 @@ class RadarrDB(Base):
     completed_on = Column(DateTime, nullable=True)
     purged = Column(Boolean, nullable=False, default=False)
 
-    def __init__(self, id: int, torrent_name: str, retries: int, import_complete: bool, notified: bool = False, completed_on: str | None = None, purged: bool = False):
-        self.id = id
+    def __init__(self, torrent_name: str, retries: int = 1, import_complete: bool = False, notified: bool = False, completed_on: str | None = None, purged: bool = False):
         self.torrent_name = torrent_name
         self.retries = retries
         self.import_complete = import_complete
