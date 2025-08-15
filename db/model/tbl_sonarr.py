@@ -12,7 +12,8 @@ class SonarrDB(Base):
     purged = Column(Boolean, nullable=False, default=False)
     completed_on = Column(DateTime, nullable=True)
 
-    def __init__(self, torrent_name: str, retries: int = 1, import_complete: bool = False, notified: bool = False, completed_on: str | None = None, purged: bool = False):
+    def __init__(self, id: int, torrent_name: str, retries: int = 1, import_complete: bool = False, notified: bool = False, completed_on: str | None = None, purged: bool = False):
+        self.id = id
         self.torrent_name = torrent_name
         self.retries = retries
         self.import_complete = import_complete
