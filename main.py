@@ -101,7 +101,7 @@ def main(db_verbose:bool=False, verbose:bool=False, dev:bool=False):
         if len(radarr_seedbox_torrent_full_path) > 0:
             if radarr_rsync_status:
                 print(f"Transferred {len(radarr_seedbox_torrent_full_path)} new Radarr torrents.")
-                message += f"Transferred {len(sonarr_seedbox_torrent_full_path)} new Radarr torrents:\n"
+                message += f"Transferred {len(radarr_seedbox_torrent_full_path)} new Radarr torrents:\n"
                 message += "\n".join(os.path.basename(path) for path in radarr_seedbox_torrent_full_path) + "\n"
             else:
                 print(f"Transferred faild for Radarr torrents with error message: {radarr_rsync_msg}")
