@@ -22,6 +22,7 @@ def main(db_verbose:bool=False, verbose:bool=False, dev:bool=False):
         exit(0)
 
     ArrService = Arr()
+    # These queue should represent the torrents file name, not display name (they can be different such that file name might delimit by . but display name delimit by space)
     sonarr_api_queue = ArrService.get_api_queue(DB_ENUM.SONARR)
     radarr_api_queue = ArrService.get_api_queue(DB_ENUM.RADARR)
 

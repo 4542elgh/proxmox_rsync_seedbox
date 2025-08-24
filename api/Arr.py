@@ -52,4 +52,4 @@ class Arr:
         else:
             print(f"Unsupported ARR service: {arr_name} or API key not set.")
             return set()
-        return set([record.title for record in queue.records if record.protocol == "torrent" and record.trackedDownloadState == "importPending"])
+        return set([record.outputPath.split("/")[-1] for record in queue.records if record.protocol == "torrent" and record.trackedDownloadState == "importPending"])
