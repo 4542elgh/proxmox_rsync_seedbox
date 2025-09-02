@@ -2,18 +2,28 @@
 import os
 import shutil
 from datetime import datetime
-from enums.enum import DB_ENUM
+# from enums.enum import DB_ENUM
 import sqlalchemy
 from sqlalchemy import select, insert, update, and_
 from db.model.tbl_radarr import RadarrDB
 from db.model.tbl_sonarr import SonarrDB
+from enum import Enum
+from log.log import Log
+from model.torrent import Torrent
+
+class ARR(Enum):
+    SONARR = "tv-sonarr"
+    RADARR = "radarr"
+
+SONARR = ARR.SONARR
+RADARR = ARR.RADARR
 
 class DB_Query:
-    def __init__(self, engine: sqlalchemy.Engine, query_verbose:bool = False) -> None:
+    def __init__(self, logger: Log, engine: sqlalchemy.Engine) -> None:
+        self.logger = logger
         self.session = engine.connect()
-        self.query_verbose = query_verbose
 
-    def mark_db_complete(self, torrents:list[str], arr_name:str) -> None:
+    def mark_db_complete(self, torrents:list[Torrent], arr_name:ARR) -> None:
         """
             Mark database entries not existing in API as completed
             It either:
@@ -23,162 +33,118 @@ class DB_Query:
                 1. Title mismatch and require manual intervention
         """
         stmt = None
-        if self.query_verbose:
-            print(f"Marking {arr_name} DB entries complete since they dont exists in API anymore")
-            if arr_name == DB_ENUM.SONARR:
-                stmt = select(SonarrDB).where(and_(SonarrDB.torrent_name.not_in(torrents), SonarrDB.import_complete == False))
-            elif arr_name == DB_ENUM.RADARR:
-                stmt = select(RadarrDB).where(and_(RadarrDB.torrent_name.not_in(torrents), RadarrDB.import_complete == False))
-            else:
-                print(f"Unknown arr_name: {arr_name}. Must be either Sonarr or Radarr.")
-                return
+        if arr_name == SONARR:
+            stmt = select(SonarrDB).where(and_(SonarrDB.torrent_name.not_in([torrent.path for torrent in torrents]), SonarrDB.import_complete is False))
+        elif arr_name == RADARR:
+            stmt = select(RadarrDB).where(and_(RadarrDB.torrent_name.not_in([torrent.path for torrent in torrents]), RadarrDB.import_complete is False))
 
-            result_set = self.session.execute(stmt).all()
-            if len(result_set) == 0:
-                print(f" - No entries to mark as complete in {arr_name} database.")
-                return
-            else:
-                print(f"Found {len(result_set)} entries to mark as complete in {arr_name} database.")
-                for result in result_set:
-                    print(f" - {result.torrent_name}")
-
-        if arr_name == DB_ENUM.SONARR:
-            stmt = update(SonarrDB).where(and_(SonarrDB.torrent_name.not_in(torrents), SonarrDB.import_complete == False)).values(dict(import_complete = True, completed_on = datetime.now()))
+        result_set = self.session.execute(stmt).all()
+        if len(result_set) == 0:
+            self.logger.info(f"No entries to mark as complete in {arr_name.value} database.")
+            return
         else:
-            stmt = update(RadarrDB).where(and_(RadarrDB.torrent_name.not_in(torrents), RadarrDB.import_complete == False)).values(dict(import_complete = True, completed_on = datetime.now()))
+            self.logger.info(f"Found {len(result_set)} entries to mark as complete in {arr_name.value} database.")
+
+        if arr_name == SONARR:
+            stmt = update(SonarrDB).where(and_(SonarrDB.torrent_name.not_in([torrent.path for torrent in torrents]), SonarrDB.import_complete is False)).values(dict(import_complete = True, completed_on = datetime.now()))
+        else:
+            stmt = update(RadarrDB).where(and_(RadarrDB.torrent_name.not_in([torrent.path for torrent in torrents]), RadarrDB.import_complete is False)).values(dict(import_complete = True, completed_on = datetime.now()))
 
         self.session.execute(stmt)
         self.session.commit()
     
-    def purge_local_complete_content(self, arr_dir: str | None = None, arr_name: str | None = None) -> None:
+    def purge_local_complete_content(self, arr_dir: str, arr_name: ARR) -> None:
         """
             Cleanup local files that finish import process
         """
-        if(arr_dir is None or len(arr_dir) == 0 or arr_name is None):
-            return
 
         stmt = None
-        if arr_name == DB_ENUM.SONARR:
-            stmt = select(SonarrDB).where(and_(SonarrDB.import_complete == True, SonarrDB.purged == False))
-        elif arr_name == DB_ENUM.RADARR:
-            stmt = select(RadarrDB).where(and_(RadarrDB.import_complete == True, RadarrDB.purged == False))
-        else:
-            print(f"Unknown arr_name: {arr_name}. Must be either Sonarr or Radarr.")
-            return
+        if arr_name == SONARR:
+            stmt = select(SonarrDB).where(and_(SonarrDB.import_complete is True, SonarrDB.purged is False))
+        elif arr_name == RADARR:
+            stmt = select(RadarrDB).where(and_(RadarrDB.import_complete is True, RadarrDB.purged is False))
 
         result_set = self.session.execute(stmt).all()
-        if self.query_verbose:
-            print(f"Purging {arr_name}'s local complete content.")
-            if len(result_set) == 0:
-                print(f" - No {arr_name} entries to purge.")
-                return None
-            else:
-                print(f"Found {len(result_set)} {arr_name} entries to purge.")
-                for result in result_set:
-                    print(f" - {result.torrent_name}")
+        self.logger.info("Purging %s items from %s local directory.", len(result_set), arr_name.value)
 
         purge_list = []
-        if arr_name == DB_ENUM.SONARR:
+        if arr_name == SONARR:
             purge_list = [SonarrDB(*result) for result in result_set]
-        else:
+        elif arr_name == RADARR:
             purge_list = [RadarrDB(*result) for result in result_set]
 
-        purge_full_path = [os.path.join(arr_dir, arr.torrent_name) for arr in purge_list]
-        
-        if self.query_verbose:
-            print(f"Purging {len(purge_full_path)} entries from local storage.")
-            for path in purge_full_path:
-                print(f" - {path}")
-
-        for path in purge_full_path:
+        for path in [os.path.join(arr_dir, arr.torrent_name) for arr in purge_list]:
             if os.path.exists(path) and not os.path.islink(path):
                 if os.path.isdir(path):
                     shutil.rmtree(path)
                 else:
                     os.remove(path)
-            else:
-                print(f"Path {path} does not exist or is a symlink, skipping deletion.")
 
-        purge_names = [arr.torrent_name for arr in purge_list]
-        if self.query_verbose:
-            print(f"Flag {len(purge_names)} entries from {arr_name} database. purged = True")
-            for name in purge_names:
-                print(f" - {name}")
-
-        if arr_name == DB_ENUM.SONARR:
-            stmt = update(SonarrDB).where(SonarrDB.torrent_name.in_(purge_names)).values(purged = True)
-        else:
-            stmt = update(RadarrDB).where(RadarrDB.torrent_name.in_(purge_names)).values(purged = True)
+        if arr_name == SONARR:
+            stmt = update(SonarrDB).where(SonarrDB.torrent_name.in_([arr.torrent_name for arr in purge_list])).values(purged = True)
+        elif arr_name == RADARR:
+            stmt = update(RadarrDB).where(RadarrDB.torrent_name.in_([arr.torrent_name for arr in purge_list])).values(purged = True)
 
         self.session.execute(stmt)
         self.session.commit()
     
-    def check_torrents_and_get_full_path(self, torrents: list[str], arr_name: str) -> list[str]:
-        need_transfer = []
+    def check_torrents_and_get_full_path(self, torrents: list[Torrent], torrent_path:str, arr_name: ARR) -> list[Torrent]:
+        need_transfer:list[Torrent] = []
         for torrent in torrents:
             db_result = None
-            if arr_name == DB_ENUM.SONARR:
+            if arr_name == SONARR:
                 db_result = self._get_torrent(SonarrDB, torrent)
-            elif arr_name == DB_ENUM.RADARR:
+            elif arr_name == RADARR:
                 db_result = self._get_torrent(RadarrDB, torrent)
 
             if db_result is None:
-                if arr_name == DB_ENUM.SONARR:
+                if arr_name == SONARR:
                     self._add_torrent(SonarrDB, torrent)
-                elif arr_name == DB_ENUM.RADARR:
+                elif arr_name == RADARR:
                     self._add_torrent(RadarrDB, torrent)
                 need_transfer.append(torrent)
             # Pylance lint error
             elif db_result.retries < 3 and not db_result.import_complete:
-                if arr_name == DB_ENUM.SONARR:
+                if arr_name == SONARR:
                     self._increment_retries(SonarrDB, torrent)
-                elif arr_name == DB_ENUM.RADARR:
+                elif arr_name == RADARR:
                     self._increment_retries(RadarrDB, torrent)
                 need_transfer.append(torrent)
             elif db_result.retries == 3 and not db_result.notified:
                 # Send out a dc alert
-                print(f"{arr_name}'s torrent: {torrent} reached 3 retries, please check manually")
+                self.logger.error("%s's torrent: %s reached 3 retries, please check manually", arr_name.value, torrent)
         
         # Return the full path of the seedbox torrents
-        if arr_name == DB_ENUM.SONARR:
-            return [os.path.join(os.getenv("SEEDBOX_SONARR_TORRENT_DIR", ""), item) for item in need_transfer]
-        elif arr_name == DB_ENUM.RADARR:
-            return [os.path.join(os.getenv("SEEDBOX_RADARR_TORRENT_DIR", ""), item) for item in need_transfer]
+        for torrent in need_transfer:
+            torrent.path = os.path.join(torrent_path, torrent.path) 
+        return need_transfer
 
-    def _add_torrent(self, database, torrent_name:str|None=None) -> None:
-        if not torrent_name:
+    def _add_torrent(self, database, torrent: Torrent) -> None:
+        if self._check_exists(database, torrent):
+            self.logger.debug("Torrent \"%s\" already exists in the Radarr database.", torrent.path)
             return None
-        if self._check_exists(database, torrent_name):
-            print(f"Torrent \"{torrent_name}\" already exists in the Radarr database.")
-            return None
-        self._insert(database, torrent_name)
-        print(f"Added torrent: \"{torrent_name}\" to the Radarr database.")
+        self._insert(database, torrent)
 
-    def _get_torrent(self, database, torrent_name: str | None = None) -> RadarrDB | SonarrDB | None:
-        if torrent_name is None:
-            return None
-        # Pylance linting error
-        stmt = select(database).where(database.torrent_name == torrent_name)
+    def _get_torrent(self, database, torrent: Torrent) -> RadarrDB | SonarrDB | None:
+        stmt = select(database).where(database.torrent_name == torrent.path)
         result = self.session.execute(stmt).first()
         if result is None:
             return None
         else:
-            return database(result.torrent_name)
+            return database(result.id, result.torrent_name)
 
-    def _increment_retries(self, database, torrent_name: str) -> None:
-        if torrent_name is None:
-            return None
+    def _increment_retries(self, database, torrent: Torrent) -> None:
         # Pylance linting error
-        stmt = update(database).where(database.torrent_name == torrent_name).values(retries = database.retries + 1)
+        stmt = update(database).where(database.torrent_name == torrent.path).values(retries = database.retries + 1)
         self.session.execute(stmt)
         self.session.commit()
 
-    def _check_exists(self, database, torrent_name: str) -> bool:
-        stmt = select(database).where(database.torrent_name == torrent_name).limit(1)
+    def _check_exists(self, database, torrent: Torrent) -> bool:
+        stmt = select(database).where(database.torrent_name == torrent.path).limit(1)
         result_set = self.session.execute(stmt)
         return result_set.first() is not None
 
-    def _insert(self, database, torrent_name: str) -> None:
-        stmt = insert(database).values(torrent_name=torrent_name)
+    def _insert(self, database, torrent: Torrent) -> None:
+        stmt = insert(database).values(torrent_name = torrent.path)
         self.session.execute(stmt)
         self.session.commit()

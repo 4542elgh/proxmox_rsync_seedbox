@@ -1,116 +1,109 @@
 import os
-from dotenv import load_dotenv
-from api.Arr import Arr
-from ssh.ssh import SSH
-from db.db import DB
-from db.db_queries import DB_Query
-from enums.enum import DB_ENUM
-from cli import rsync
-from cli.rsync import Rsync
-from cli.notification import Notification
+from api import Arr
+from ssh import ssh
+from db import db, db_queries
+from cli import rsync, notification
+import config
+from log.log import Log
+from model.torrent import Torrent
 
-load_dotenv()
-
-DB_PATH = "db/database.db"
-
-def main(db_verbose:bool=False, verbose:bool=False, dev:bool=False):
-    if dev and os.path.exists(DB_PATH):
-        os.remove(DB_PATH)  # Remove the database file if it exists, for testing purposes only
+def main(logger:Log) -> None:
+    if config.DEV and os.path.exists(config.DB_PATH):
+        os.remove(config.DB_PATH)  # Remove the database file if it exists, for testing purposes only
 
     if(rsync.check_running_state()):
-        print("Rsync is currently running. Exiting to avoid conflicts.")
+        logger.info("Rsync is currently running. Exiting to avoid conflicts.")
         exit(0)
 
-    ArrService = Arr()
+    arr_service = Arr.Arr(logger = logger)
+
     # These queue should represent the torrents file name, not display name (they can be different such that file name might delimit by . but display name delimit by space)
-    sonarr_api_queue = ArrService.get_api_queue(DB_ENUM.SONARR)
-    radarr_api_queue = ArrService.get_api_queue(DB_ENUM.RADARR)
+    sonarr_api_queue:list[Torrent] = arr_service.get_api_queue(config.SONARR_ENDPOINT, config.SONARR_API_KEY, Arr.SONARR)
+    radarr_api_queue:list[Torrent] = arr_service.get_api_queue(config.RADARR_ENDPOINT, config.RADARR_API_KEY, Arr.RADARR)
+    
+    ssh_conn = ssh.SSH(logger = logger,
+                    host = config.SEEDBOX_ENDPOINT,
+                    port = config.SEEDBOX_PORT,
+                    username = config.SEEDBOX_USERNAME)
 
     # # These are imports pending in Arr and exists in seedbox, filtering so only remote seedbox torrent are included
-    ssh_conn = SSH(host=os.getenv("SEEDBOX_ENDPOINT"), port=os.getenv("SEEDBOX_PORT"), username=os.getenv("SEEDBOX_USERNAME"))
-    sonarr_pending_import = ssh_conn.filter_seedbox_against_api(sonarr_api_queue, DB_ENUM.SONARR)
-    radarr_pending_import = ssh_conn.filter_seedbox_against_api(radarr_api_queue, DB_ENUM.RADARR)
-
-    if verbose:
-        print("Sonarr list pending import:")
-        if len(sonarr_pending_import) == 0:
-            print(" - No pending Sonarr imports found.")
-        else:
-            for item in sonarr_pending_import:
-                print(f" - {item}")
-        print("Radarr list pending import:")
-        if len(radarr_pending_import) == 0:
-            print(" - No pending Radarr imports found.")
-        else:
-            for item in radarr_pending_import:
-                print(f" - {item}")
+    sonarr_pending_import = ssh_conn.filter_seedbox_against_api(config.SEEDBOX_SONARR_TORRENT_PATH, sonarr_api_queue, ssh.SONARR)
+    logger.info("Sonarr pending import exists in Seedbox: %s", sonarr_pending_import)
+    radarr_pending_import = ssh_conn.filter_seedbox_against_api(config.SEEDBOX_RADARR_TORRENT_PATH, radarr_api_queue, ssh.RADARR)
+    logger.info("Radarr pending import exists in Seedbox: %s", radarr_pending_import)
 
     # # Check against database if the torrent already tried import. Try a max of 3 times before giving up and send Discord message
-    db = DB(db_verbose)
-    db_engine = db.get_engine()
-    db_query = DB_Query(db_engine, query_verbose=verbose)
+    db_engine = db.DB(logger)
+    db_engine = db_engine.get_engine()
+    db_query = db_queries.DB_Query(logger, db_engine)
 
     # Mark torrent name not in API result list as complete.
     # It either finish transfer or user cancel the import job in Activity Tab
-    db_query.mark_db_complete(sonarr_pending_import, DB_ENUM.SONARR)
-    db_query.mark_db_complete(radarr_pending_import, DB_ENUM.RADARR)
+    db_query.mark_db_complete(sonarr_pending_import, db_queries.SONARR)
+    db_query.mark_db_complete(radarr_pending_import, db_queries.RADARR)
 
     # If it does not exists in API anymore, it means the import is complete
-    db_query.purge_local_complete_content(os.getenv("SONARR_DEST_DIR"), DB_ENUM.SONARR)
-    db_query.purge_local_complete_content(os.getenv("RADARR_DEST_DIR"), DB_ENUM.RADARR)
+    db_query.purge_local_complete_content(config.SONARR_DEST_DIR, db_queries.SONARR)
+    db_query.purge_local_complete_content(config.RADARR_DEST_DIR, db_queries.RADARR)
 
     # Only return list of full path seedbox torrents not in database (aka. new torrents)
-    sonarr_seedbox_torrent_full_path = db_query.check_torrents_and_get_full_path(sonarr_pending_import, DB_ENUM.SONARR)
-    radarr_seedbox_torrent_full_path = db_query.check_torrents_and_get_full_path(radarr_pending_import, DB_ENUM.RADARR)
+    sonarr_seedbox_torrent_full_path:list[Torrent] = db_query.check_torrents_and_get_full_path(sonarr_pending_import, config.SEEDBOX_SONARR_TORRENT_PATH, db_queries.SONARR)
+    radarr_seedbox_torrent_full_path:list[Torrent] = db_query.check_torrents_and_get_full_path(radarr_pending_import, config.SEEDBOX_RADARR_TORRENT_PATH, db_queries.RADARR)
 
+    sonarr_rsync_status = False
+    sonarr_rsync_msg = ""
     if len(sonarr_seedbox_torrent_full_path) > 0:
-        sonarr_rsync_status, sonarr_rsync_msg = Rsync(user = os.getenv("SEEDBOX_USERNAME", ""),
-            seedbox_url = os.getenv("SEEDBOX_ENDPOINT", ""),
+        sonarr_rsync_status, sonarr_rsync_msg = rsync.Rsync(
+            logger = logger,
+            user = config.SEEDBOX_USERNAME,
+            seedbox_endpoint = config.SEEDBOX_ENDPOINT,
+            port = config.SEEDBOX_PORT,
             sources = sonarr_seedbox_torrent_full_path,
-            destination = os.getenv("SONARR_DEST_DIR", ""),
-            port = os.getenv("SEEDBOX_PORT", "0"),
-            arr_name = "Sonarr",
-            verbose = verbose).execute()
-    elif verbose:
-        print("No Sonarr torrents to transfer.")
+            destination = config.SONARR_DEST_DIR,
+            arr_name = rsync.SONARR).execute()
+    else:
+        logger.info("No Sonarr torrents to transfer.")
 
+    radarr_rsync_status = False
+    radarr_rsync_msg = ""
     if len(radarr_seedbox_torrent_full_path) > 0:
-        radarr_rsync_status, radarr_rsync_msg = Rsync(user=os.getenv("SEEDBOX_USERNAME", ""),
-            seedbox_url=os.getenv("SEEDBOX_ENDPOINT", ""),
-            sources=radarr_seedbox_torrent_full_path,
-            destination=os.getenv("RADARR_DEST_DIR", ""),
-            port=os.getenv("SEEDBOX_PORT", "0"),
-            verbose = verbose).execute()
-    elif verbose:
-        print("No Radarr torrents to transfer.")
+        radarr_rsync_status, radarr_rsync_msg = rsync.Rsync(
+            logger = logger,
+            user = config.SEEDBOX_USERNAME,
+            seedbox_endpoint = config.SEEDBOX_ENDPOINT,
+            port = config.SEEDBOX_PORT,
+            sources = radarr_seedbox_torrent_full_path,
+            destination = config.SONARR_DEST_DIR,
+            arr_name=rsync.RADARR).execute()
+    else:
+        logger.info("No Radarr torrents to transfer.")
 
     if len(sonarr_seedbox_torrent_full_path) == 0 and len(radarr_seedbox_torrent_full_path) == 0:
-        print("No new torrents to transfer.")
+        logger.info("No new torrents to transfer.")
     elif len(sonarr_seedbox_torrent_full_path) > 0 or len(radarr_seedbox_torrent_full_path) > 0:
         message = ""
         severity = "message"
 
         if len(sonarr_seedbox_torrent_full_path) > 0:
             if sonarr_rsync_status:
-                print(f"Transferred {len(sonarr_seedbox_torrent_full_path)} new Sonarr torrents.")
+                logger.info(f"Transferred {len(sonarr_seedbox_torrent_full_path)} new Sonarr torrents.")
                 message += f"Transferred {len(sonarr_seedbox_torrent_full_path)} new Sonarr torrents:\n"
-                message += "\n".join(os.path.basename(path) for path in sonarr_seedbox_torrent_full_path) + "\n"
+                message += "\n".join(os.path.basename(torrent.path) for torrent in sonarr_seedbox_torrent_full_path) + "\n"
             else:
-                print(f"Transferred faild for Sonarr torrents with error message: {sonarr_rsync_msg}")
-                message += f"Transferred faild for Sonarr torrents with error message: {sonarr_rsync_msg}" 
+                logger.error(f"Transferred failed for Sonarr torrents with error message: {sonarr_rsync_msg}")
+                message += f"Transferred faild for Sonarr torrents with error message: {sonarr_rsync_msg}"
                 severity = "error"
+
         if len(radarr_seedbox_torrent_full_path) > 0:
             if radarr_rsync_status:
-                print(f"Transferred {len(radarr_seedbox_torrent_full_path)} new Radarr torrents.")
+                logger.info(f"Transferred {len(radarr_seedbox_torrent_full_path)} new Radarr torrents.")
                 message += f"Transferred {len(radarr_seedbox_torrent_full_path)} new Radarr torrents:\n"
-                message += "\n".join(os.path.basename(path) for path in radarr_seedbox_torrent_full_path) + "\n"
+                message += "\n".join(os.path.basename(torrent.path) for torrent in radarr_seedbox_torrent_full_path) + "\n"
             else:
-                print(f"Transferred faild for Radarr torrents with error message: {radarr_rsync_msg}")
-                message += f"Transferred faild for Radarr torrents with error message: {radarr_rsync_msg}" 
+                logger.error(f"Transferred faild for Radarr torrents with error message: {radarr_rsync_msg}")
+                message += f"Transferred faild for Radarr torrents with error message: {radarr_rsync_msg}"
                 severity = "error"
-        Notification(os.getenv("WEBHOOK_URL")).send_notification(message, severity)
+        notification.Notification(logger, config.WEBHOOK_URL, notification.DISCORD).send_notification(message, severity)
 
 if __name__ == "__main__":
-    main(db_verbose = os.getenv("DB_VERBOSE", "False").lower() == "true",
-         verbose = os.getenv("VERBOSE", "False").lower() == "true",
-         dev = os.getenv("DEV", "False").lower() == "true")
+    main(Log(config.VERBOSE))
