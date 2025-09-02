@@ -12,7 +12,7 @@ def main(logger:Log) -> None:
         os.remove(config.DB_PATH)  # Remove the database file if it exists, for testing purposes only
 
     if(rsync.check_running_state()):
-        logger.info("Rsync is currently running. Exiting to avoid conflicts.")
+        logger.error("Rsync is currently running. Exiting to avoid conflicts.")
         exit(0)
 
     arr_service = Arr.Arr(logger = logger)

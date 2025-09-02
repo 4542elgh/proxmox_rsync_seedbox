@@ -1,4 +1,6 @@
+import os
 import logging
+from pathlib import Path
 
 class Log:
     def __init__(self, level:str) -> None:
@@ -8,7 +10,7 @@ class Log:
             # filemode="a",
             datefmt='%Y-%m-%d %H:%M:%S',
             handlers=[
-                logging.FileHandler("app.log"),
+                logging.FileHandler(os.path.join(os.path.dirname(Path(__file__).resolve()), "app.log")),
                 logging.StreamHandler()
             ]
         )
