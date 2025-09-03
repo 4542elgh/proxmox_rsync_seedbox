@@ -67,5 +67,5 @@ Check SSH connectivity to the seedbox and make sure it is using key authenticati
 Please check if rsync is installed on **both end** of the system. Your local machine should have it, the seedbox should also have it.
 
 # TODO
-- Trigger notification system via apprise or discord webhook
 - Unit Test
+- Check if local directory size equal to remote size, (this will only happen when rsync is not in progress) if size does not match (aka. rsync got interrupted) delete local folder and db entry and import again
