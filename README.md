@@ -68,4 +68,3 @@ Please check if rsync is installed on **both end** of the system. Your local mac
 
 # TODO
 - Unit Test
-- Check if local directory size equal to remote size, (this will only happen when rsync is not in progress) if size does not match (aka. rsync got interrupted) delete local folder and db entry and import again
