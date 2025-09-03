@@ -34,9 +34,10 @@ class DB_Query:
         """
         stmt = None
         if arr_name == SONARR:
-            stmt = select(SonarrDB).where(and_(SonarrDB.torrent_name.not_in([torrent.path for torrent in torrents]), SonarrDB.import_complete is False))
+            # Done try to change "== False", I tried "is False" and "not var_name", both does not work
+            stmt = select(SonarrDB).where(and_(SonarrDB.torrent_name.not_in([torrent.path for torrent in torrents]), SonarrDB.import_complete == False))
         elif arr_name == RADARR:
-            stmt = select(RadarrDB).where(and_(RadarrDB.torrent_name.not_in([torrent.path for torrent in torrents]), RadarrDB.import_complete is False))
+            stmt = select(RadarrDB).where(and_(RadarrDB.torrent_name.not_in([torrent.path for torrent in torrents]), RadarrDB.import_complete == False))
 
         result_set = self.session.execute(stmt).all()
         if len(result_set) == 0:
@@ -46,23 +47,21 @@ class DB_Query:
             self.logger.info(f"Found {len(result_set)} entries to mark as complete in {arr_name.value} database.")
 
         if arr_name == SONARR:
-            stmt = update(SonarrDB).where(and_(SonarrDB.torrent_name.not_in([torrent.path for torrent in torrents]), SonarrDB.import_complete is False)).values(dict(import_complete = True, completed_on = datetime.now()))
+            stmt = update(SonarrDB).where(and_(SonarrDB.torrent_name.not_in([torrent.path for torrent in torrents]), SonarrDB.import_complete == False)).values(dict(import_complete = True, completed_on = datetime.now()))
         else:
-            stmt = update(RadarrDB).where(and_(RadarrDB.torrent_name.not_in([torrent.path for torrent in torrents]), RadarrDB.import_complete is False)).values(dict(import_complete = True, completed_on = datetime.now()))
+            stmt = update(RadarrDB).where(and_(RadarrDB.torrent_name.not_in([torrent.path for torrent in torrents]), RadarrDB.import_complete == False)).values(dict(import_complete = True, completed_on = datetime.now()))
 
         self.session.execute(stmt)
         self.session.commit()
     
     def purge_local_complete_content(self, arr_dir: str, arr_name: ARR) -> None:
-        """
-            Cleanup local files that finish import process
-        """
+        """ Cleanup local files that finish import process """
 
         stmt = None
         if arr_name == SONARR:
-            stmt = select(SonarrDB).where(and_(SonarrDB.import_complete is True, SonarrDB.purged is False))
+            stmt = select(SonarrDB).where(and_(SonarrDB.import_complete == True, SonarrDB.purged == False))
         elif arr_name == RADARR:
-            stmt = select(RadarrDB).where(and_(RadarrDB.import_complete is True, RadarrDB.purged is False))
+            stmt = select(RadarrDB).where(and_(RadarrDB.import_complete == True, RadarrDB.purged == False))
 
         result_set = self.session.execute(stmt).all()
         self.logger.info("Purging %s items from %s local directory.", len(result_set), arr_name.value)

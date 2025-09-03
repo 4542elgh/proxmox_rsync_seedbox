@@ -50,31 +50,31 @@ def main(logger:Log) -> None:
     sonarr_seedbox_torrent_full_path:list[Torrent] = db_query.check_torrents_and_get_full_path(sonarr_pending_import, config.SEEDBOX_SONARR_TORRENT_PATH, db_queries.SONARR)
     radarr_seedbox_torrent_full_path:list[Torrent] = db_query.check_torrents_and_get_full_path(radarr_pending_import, config.SEEDBOX_RADARR_TORRENT_PATH, db_queries.RADARR)
 
+    rsync_util = rsync.Rsync(logger)
+
     sonarr_rsync_status = False
     sonarr_rsync_msg = ""
     if len(sonarr_seedbox_torrent_full_path) > 0:
-        sonarr_rsync_status, sonarr_rsync_msg = rsync.Rsync(
-            logger = logger,
+        sonarr_rsync_status, sonarr_rsync_msg = rsync_util.transfer_from_remote(
             user = config.SEEDBOX_USERNAME,
             seedbox_endpoint = config.SEEDBOX_ENDPOINT,
             port = config.SEEDBOX_PORT,
             sources = sonarr_seedbox_torrent_full_path,
             destination = config.SONARR_DEST_DIR,
-            arr_name = rsync.SONARR).execute()
+            arr_name = rsync.SONARR)
     else:
         logger.info("No Sonarr torrents to transfer.")
 
     radarr_rsync_status = False
     radarr_rsync_msg = ""
     if len(radarr_seedbox_torrent_full_path) > 0:
-        radarr_rsync_status, radarr_rsync_msg = rsync.Rsync(
-            logger = logger,
+        radarr_rsync_status, radarr_rsync_msg = rsync_util.transfer_from_remote(
             user = config.SEEDBOX_USERNAME,
             seedbox_endpoint = config.SEEDBOX_ENDPOINT,
             port = config.SEEDBOX_PORT,
             sources = radarr_seedbox_torrent_full_path,
-            destination = config.SONARR_DEST_DIR,
-            arr_name=rsync.RADARR).execute()
+            destination = config.RADARR_DEST_DIR,
+            arr_name=rsync.RADARR)
     else:
         logger.info("No Radarr torrents to transfer.")
 

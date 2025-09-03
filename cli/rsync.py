@@ -13,25 +13,33 @@ SONARR = ARR.SONARR
 RADARR = ARR.RADARR
 
 class Rsync:
-    def __init__(self, logger:Log, user:str, seedbox_endpoint:str, sources:list[Torrent], destination:str, port:int, arr_name:ARR) -> None:
+    def __init__(self, logger:Log) -> None:
         self.logger = logger
-        self.user = user
-        self.sources = [f"{user}@{seedbox_endpoint}:{source.path}" for source in sources]
-        self.destination = destination
-        self.port = port
-        self.options = ["--archive", "--compress", "--verbose" , "-e" , "ssh -p 34100"]
+
+    def transfer_from_remote(self, user:str, seedbox_endpoint:str, sources:list[Torrent], destination:str, port:int, arr_name:ARR) -> (bool, str):
+        # TODO: port is not dynamic
+        sources_full_path = [f"{user}@{seedbox_endpoint}:{source.path}" for source in sources]
+        options = ["--archive",
+                    "--no-compress", # --compress might be killing performance, in face we specifically use no-compress
+                    "--whole-file",
+                    "--sparse",
+                    "--acls",
+                    "--xattrs",
+                    "--executability",
+                    "--verbose" ,
+                    "-e" ,
+                    "ssh -p " + str(port)]
         self.logger.info("Initialized %s Rsync transferring sources: %s", arr_name.value, sources)
 
-    def execute(self) -> (bool, str):
-        if not os.path.exists(self.destination):
-            self.logger.error("Destination folder %s does not exist. Please double check path", self.destination)
+        if not os.path.exists(destination):
+            self.logger.error("Destination folder %s does not exist. Please double check path", destination)
             exit(1)
 
         command = [
             "rsync",
-            *self.options, # unpack the list into individual strings
-            *self.sources,
-            self.destination
+            *options, # unpack the list into individual strings
+            *sources_full_path,
+            destination
         ]
 
         # Run it in frontend if running by Systemd (PID1), running in background with (PID1) will crash rsync
