@@ -103,7 +103,11 @@ def main(logger:Log) -> None:
                 logger.error(f"Transferred faild for Radarr torrents with error message: {radarr_rsync_msg}")
                 message += f"Transferred faild for Radarr torrents with error message: {radarr_rsync_msg}"
                 severity = "error"
-        notification.Notification(logger, config.WEBHOOK_URL, notification.DISCORD).send_notification(message, severity)
+
+        if config.NOTIFICATION_SERVICE and config.NOTIFICATION_SERVICE == "apprise":
+            notification.Notification(logger, config.WEBHOOK_URL, notification.APPRISE).send_notification(message, severity)
+        elif config.NOTIFICATION_SERVICE and config.NOTIFICATION_SERVICE == "discord":
+            notification.Notification(logger, config.WEBHOOK_URL, notification.DISCORD).send_notification(message, severity)
 
 if __name__ == "__main__":
     main(Log(config.VERBOSE))

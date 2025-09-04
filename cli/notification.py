@@ -15,7 +15,7 @@ class Notification:
     """
         Notification is optional, dont need to show in log if not defined
     """
-    def __init__(self, logger: Log, webhook_url:str, service: NOTIFICATION) -> None:
+    def __init__(self, logger: Log, webhook_url: str, service: NOTIFICATION) -> None:
         self.logger = logger
         self.WEBHOOK_URL = webhook_url
         self.SERVICE = service
