@@ -97,19 +97,19 @@ class DB_Query:
                 db_result = self._get_torrent(RadarrDB, torrent)
 
             if db_result is None:
+                need_transfer.append(torrent)
                 if arr_name == SONARR:
                     self._add_torrent(SonarrDB, torrent)
                 elif arr_name == RADARR:
                     self._add_torrent(RadarrDB, torrent)
-                need_transfer.append(torrent)
             # Pylance lint error
             elif db_result.retries < 3 and not db_result.import_complete:
+                need_transfer.append(torrent)
                 if arr_name == SONARR:
                     self._increment_retries(SonarrDB, torrent)
                 elif arr_name == RADARR:
                     self._increment_retries(RadarrDB, torrent)
-                need_transfer.append(torrent)
-            elif db_result.retries == 3 and not db_result.notified:
+            elif db_result.retries == 3 and not db_result.notified and not db_result.import_complete:
                 # Send out a dc alert
                 self.logger.error("%s's torrent: %s reached 3 retries, please check manually", arr_name.value, torrent)
         

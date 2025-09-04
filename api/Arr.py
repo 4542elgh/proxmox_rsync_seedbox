@@ -62,7 +62,7 @@ class Arr():
 
         results:list[Torrent] = []
         for record in queue.records:
-            if record.protocol == "torrent" and record.trackedDownloadState == "importPending" and record.outputPath is not None:
+            if record.protocol == "torrent" and record.trackedDownloadState in ["importPending", "importBlocked"] and record.outputPath is not None:
                 output_path = record.outputPath
 
                 # Search for arr term and strip to only relative path, can have many level depth
