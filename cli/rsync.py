@@ -17,8 +17,7 @@ class Rsync:
         self.logger = logger
 
     def transfer_from_remote(self, user:str, seedbox_endpoint:str, sources:list[Torrent], destination:str, port:int, arr_name:ARR) -> (bool, str):
-        # TODO: port is not dynamic
-        sources_full_path = [f"{user}@{seedbox_endpoint}:{source.path}" for source in sources]
+        sources_full_path = [f"{user}@{seedbox_endpoint}:{source.full_path}" for source in sources]
         options = ["--archive",
                     "--no-compress", # --compress might be killing performance, in face we specifically use no-compress
                     "--whole-file",

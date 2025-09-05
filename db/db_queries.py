@@ -97,6 +97,7 @@ class DB_Query:
                 db_result = self._get_torrent(RadarrDB, torrent)
 
             if db_result is None:
+                torrent.notified = False
                 need_transfer.append(torrent)
                 if arr_name == SONARR:
                     self._add_torrent(SonarrDB, torrent)
@@ -112,11 +113,24 @@ class DB_Query:
             elif db_result.retries == 3 and not db_result.notified and not db_result.import_complete:
                 # Send out a dc alert
                 self.logger.error("%s's torrent: %s reached 3 retries, please check manually", arr_name.value, torrent)
+            else:
+                torrent.notified = db_result.notified
         
         # Return the full path of the seedbox torrents
         for torrent in need_transfer:
-            torrent.path = os.path.join(torrent_path, torrent.path) 
+            torrent.full_path = os.path.join(torrent_path, torrent.path)
         return need_transfer
+
+    def set_notified(self, arr_name: ARR, torrent: Torrent) -> None:
+        database = None
+        if arr_name == SONARR:
+            database = SonarrDB
+        else:
+            database = RadarrDB
+
+        stmt = update(database).where(database.torrent_name == torrent.path).values(notified = True)
+        self.session.execute(stmt)
+        self.session.commit()
 
     def _add_torrent(self, database, torrent: Torrent) -> None:
         if self._check_exists(database, torrent):
@@ -126,11 +140,12 @@ class DB_Query:
 
     def _get_torrent(self, database, torrent: Torrent) -> RadarrDB | SonarrDB | None:
         stmt = select(database).where(database.torrent_name == torrent.path)
-        result = self.session.execute(stmt).first()
+        result = self.session.execute(stmt).first()._asdict()
         if result is None:
             return None
         else:
-            return database(result.id, result.torrent_name)
+            # return database(result.id, result.torrent_name)
+            return database(**result)
 
     def _increment_retries(self, database, torrent: Torrent) -> None:
         # Pylance linting error
