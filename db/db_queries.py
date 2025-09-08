@@ -140,12 +140,12 @@ class DB_Query:
 
     def _get_torrent(self, database, torrent: Torrent) -> RadarrDB | SonarrDB | None:
         stmt = select(database).where(database.torrent_name == torrent.path)
-        result = self.session.execute(stmt).first()._asdict()
+        result = self.session.execute(stmt).first()
         if result is None:
             return None
         else:
             # return database(result.id, result.torrent_name)
-            return database(**result)
+            return database(**(result._asdict()))
 
     def _increment_retries(self, database, torrent: Torrent) -> None:
         # Pylance linting error

@@ -6,10 +6,15 @@ from cli import rsync, notification
 import config
 from log.log import Log
 from model.torrent import Torrent
+import shutil
+
 
 def main(logger:Log) -> None:
-    if config.DEV and os.path.exists(config.DB_PATH):
-        os.remove(config.DB_PATH)  # Remove the database file if it exists, for testing purposes only
+    # Get a copy of production db
+    if config.DEV:
+        if os.path.exists(config.DB_PATH):
+            os.remove(config.DB_PATH)  # Remove the database file if it exists, for testing purposes only
+        shutil.copy2("/usr/local/bin/proxmox_rsync_seedbox/db/database.db", f"{config.DB_PATH}/database.db")
 
     if(rsync.check_running_state()):
         logger.error("Rsync is currently running. Exiting to avoid conflicts.")
