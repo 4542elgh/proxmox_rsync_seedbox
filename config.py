@@ -26,7 +26,11 @@ NOTIFICATION_SERVICE:str = os.getenv("NOTIFICATION_SERVICE", "") # Options: "app
 WEBHOOK_URL:str = os.getenv("WEBHOOK_URL", "") # Omit this line to disable notifications
 APPRISE_TAG:str = os.getenv("APPRISE_TAG", "") # Only for apprise notifications
 
+CHOWN_UID:str = os.getenv("CHOWN_UID", "")
+CHOWN_GID:str = os.getenv("CHOWN_GID", "")
+CHMOD:str = os.getenv("CHMOD", "")
+
 DEV:bool = os.getenv("DEV", "").lower() in ["true", "1", "t"] # Set to True to remove and recreate the database for testing purposes
 VERBOSE:str = os.getenv("VERBOSE", "").lower() if os.getenv("VERBOSE", "").lower() in ["debug", "info", "error"] else "error" # Default to error log level
 DB_VERBOSE:bool = os.getenv("DB_VERBOSE", "").lower() in ["true", "1", "t"] # Set to True to enable database operation logging
-DB_PATH:str = os.getenv("db/database.db", "")
+DB_PATH:str = os.getenv("DB_PATH", "")

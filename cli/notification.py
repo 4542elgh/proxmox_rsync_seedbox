@@ -41,7 +41,8 @@ class Notification:
             payload = {
                 "embeds": [
                     {
-                        "title": message,
+                        "title": "Rsync Seedbox",
+                        "description": message,
                         "color": 16711680 if severity == "error" else 65280
                     }
                 ]

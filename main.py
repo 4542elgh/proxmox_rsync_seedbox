@@ -2,7 +2,7 @@ import os
 from api import Arr
 from ssh import ssh
 from db import db, db_queries
-from cli import rsync, notification
+from cli import rsync, notification, permission
 import config
 from log.log import Log
 from model.torrent import Torrent
@@ -14,7 +14,7 @@ def main(logger:Log) -> None:
     if config.DEV:
         if os.path.exists(config.DB_PATH):
             os.remove(config.DB_PATH)  # Remove the database file if it exists, for testing purposes only
-        shutil.copy2("/usr/local/bin/proxmox_rsync_seedbox/db/database.db", f"{config.DB_PATH}/database.db")
+        shutil.copy2("/usr/local/bin/proxmox_rsync_seedbox/db/database.db", f"{config.DB_PATH}")
 
     if(rsync.check_running_state()):
         logger.error("Rsync is currently running. Exiting to avoid conflicts.")
@@ -55,6 +55,10 @@ def main(logger:Log) -> None:
     sonarr_seedbox_torrent:list[Torrent] = db_query.check_torrents_and_get_full_path(sonarr_pending_import, config.SEEDBOX_SONARR_TORRENT_PATH, db_queries.SONARR)
     radarr_seedbox_torrent:list[Torrent] = db_query.check_torrents_and_get_full_path(radarr_pending_import, config.SEEDBOX_RADARR_TORRENT_PATH, db_queries.RADARR)
 
+    perm = permission.Permission()
+    perm.update_permission(config.SONARR_DEST_DIR, sonarr_seedbox_torrent, config.CHOWN_UID, config.CHOWN_GID, config.CHMOD)
+    perm.update_permission(config.RADARR_DEST_DIR, radarr_seedbox_torrent, config.CHOWN_UID, config.CHOWN_GID, config.CHMOD)
+
     rsync_util = rsync.Rsync(logger)
 
     sonarr_rsync_status = False
@@ -82,6 +86,10 @@ def main(logger:Log) -> None:
             arr_name=rsync.RADARR)
     else:
         logger.info("No Radarr torrents to transfer.")
+
+    perm = permission.Permission()
+    perm.update_permission(config.SONARR_DEST_DIR, sonarr_seedbox_torrent, config.CHOWN_UID, config.CHOWN_GID, config.CHMOD)
+    perm.update_permission(config.RADARR_DEST_DIR, radarr_seedbox_torrent, config.CHOWN_UID, config.CHOWN_GID, config.CHMOD)
 
     # Only notify ones that has not been notified. Dont want to spam Discord
     sonarr_need_notify = [torrent for torrent in sonarr_seedbox_torrent if not torrent.notified]
