@@ -41,7 +41,7 @@ class Rsync:
             destination
         ]
 
-        # Run it in frontend if running by Systemd (PID1), running in background with (PID1) will crash rsync
+        # Run in foreground (blocking) if running by Systemd (PID1), running in background with (PID1) will crash rsync
         if psutil.Process(os.getpid()).ppid() == 1:
             process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             _, stderr = process.communicate()

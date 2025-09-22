@@ -112,7 +112,7 @@ class DB_Query:
                     self._increment_retries(RadarrDB, torrent)
             elif db_result.retries == 3 and not db_result.notified and not db_result.import_complete:
                 # Send out a dc alert
-                self.logger.error("%s's torrent: %s reached 3 retries, please check manually", arr_name.value, torrent)
+                self.logger.error("%s's torrent: %s reached 3 retries, please check manually", arr_name.value, os.path.dirname(torrent.path))
             else:
                 torrent.notified = db_result.notified
         

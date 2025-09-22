@@ -2,15 +2,23 @@ import os
 from model.torrent import Torrent
 from pwd import getpwnam
 from grp import getgrnam
+import logging
 
 class Permission:
+    def __init__(self) -> None:
+        self.logger = logging.getLogger()
+
     def update_permission(self, host_dir:str, paths: list[Torrent], chown_uid:str, chown_gid:str, chmod:str = ""):
         # Do not restrict user to use both chmod and chown, handle them separately for freedom
         if chmod:
             chmod_val = self._get_chmod_enums(chmod)
             for torrent in paths:
                 parent_dir = os.path.join(os.path.join(host_dir, torrent.path))
-                os.chmod(parent_dir, chmod_val)
+                try:
+                    os.chmod(parent_dir, chmod_val)
+                except IOError as e:
+                    self.logger.error("os.chmod raised an error: %s", e)
+
                 for (new_base, dirs, files) in os.walk(parent_dir):
                     os.chmod(new_base, chmod_val)
                     # We dont do dirs, due to they will be new_base on next iteration

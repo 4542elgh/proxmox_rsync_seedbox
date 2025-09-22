@@ -8,7 +8,6 @@ from log.log import Log
 from model.torrent import Torrent
 import shutil
 
-
 def main(logger:Log) -> None:
     # Get a copy of production db
     if config.DEV:
@@ -54,10 +53,6 @@ def main(logger:Log) -> None:
     # Only return list of full path seedbox torrents not in database (aka. new torrents)
     sonarr_seedbox_torrent:list[Torrent] = db_query.check_torrents_and_get_full_path(sonarr_pending_import, config.SEEDBOX_SONARR_TORRENT_PATH, db_queries.SONARR)
     radarr_seedbox_torrent:list[Torrent] = db_query.check_torrents_and_get_full_path(radarr_pending_import, config.SEEDBOX_RADARR_TORRENT_PATH, db_queries.RADARR)
-
-    perm = permission.Permission()
-    perm.update_permission(config.SONARR_DEST_DIR, sonarr_seedbox_torrent, config.CHOWN_UID, config.CHOWN_GID, config.CHMOD)
-    perm.update_permission(config.RADARR_DEST_DIR, radarr_seedbox_torrent, config.CHOWN_UID, config.CHOWN_GID, config.CHMOD)
 
     rsync_util = rsync.Rsync(logger)
 
